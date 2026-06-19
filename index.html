@@ -1,1372 +1,432 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Ark Captions — AI Auto Captioning</title>
-<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-<style>
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-  :root {
-    --ark-bg: #0A0B14;
-    --ark-surface: #111220;
-    --ark-card: #161828;
-    --ark-border: rgba(255,255,255,0.07);
-    --ark-border-bright: rgba(255,255,255,0.15);
-    --ark-accent: #FF6B35;
-    --ark-accent2: #7C3AED;
-    --ark-accent3: #00D4AA;
-    --ark-neon: #FFE147;
-    --ark-text: #F0F0F8;
-    --ark-muted: #7A7A9A;
-    --ark-dim: #4A4A6A;
-    --font-head: 'Syne', sans-serif;
-    --font-body: 'DM Sans', sans-serif;
-    --font-mono: 'JetBrains Mono', monospace;
-  }
-
-  body {
-    background: var(--ark-bg);
-    color: var(--ark-text);
-    font-family: var(--font-body);
-    min-height: 100vh;
-    overflow-x: hidden;
-  }
-
-  /* Background grid */
-  body::before {
-    content: '';
-    position: fixed;
-    inset: 0;
-    background-image: 
-      linear-gradient(rgba(124,58,237,0.03) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(124,58,237,0.03) 1px, transparent 1px);
-    background-size: 48px 48px;
-    pointer-events: none;
-    z-index: 0;
-  }
-
-  /* Ambient blobs */
-  .blob {
-    position: fixed;
-    border-radius: 50%;
-    filter: blur(100px);
-    pointer-events: none;
-    z-index: 0;
-    opacity: 0.18;
-  }
-  .blob-1 { width: 500px; height: 500px; background: var(--ark-accent2); top: -100px; left: -100px; }
-  .blob-2 { width: 400px; height: 400px; background: var(--ark-accent); bottom: 0; right: -100px; }
-  .blob-3 { width: 300px; height: 300px; background: var(--ark-accent3); top: 40%; left: 50%; transform: translateX(-50%); opacity: 0.1; }
-
-  .app-shell {
-    position: relative;
-    z-index: 1;
-    display: grid;
-    grid-template-columns: 260px 1fr;
-    grid-template-rows: 64px 1fr;
-    min-height: 100vh;
-  }
-
-  /* ── TOPBAR ── */
-  .topbar {
-    grid-column: 1 / -1;
-    display: flex;
-    align-items: center;
-    padding: 0 24px;
-    background: rgba(10,11,20,0.85);
-    backdrop-filter: blur(20px);
-    border-bottom: 1px solid var(--ark-border);
-    gap: 16px;
-  }
-
-  .logo {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    text-decoration: none;
-  }
-
-  .logo-icon {
-    width: 34px;
-    height: 34px;
-    background: linear-gradient(135deg, var(--ark-accent) 0%, var(--ark-accent2) 100%);
-    border-radius: 9px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-family: var(--font-head);
-    font-weight: 800;
-    font-size: 15px;
-    color: #fff;
-    letter-spacing: -0.5px;
-    flex-shrink: 0;
-  }
-
-  .logo-text {
-    font-family: var(--font-head);
-    font-weight: 700;
-    font-size: 18px;
-    color: var(--ark-text);
-    letter-spacing: -0.3px;
-  }
-
-  .logo-badge {
-    font-size: 10px;
-    font-weight: 500;
-    font-family: var(--font-body);
-    background: linear-gradient(135deg, var(--ark-accent), var(--ark-accent2));
-    color: #fff;
-    padding: 2px 7px;
-    border-radius: 20px;
-    letter-spacing: 0.5px;
-    text-transform: uppercase;
-  }
-
-  .topbar-spacer { flex: 1; }
-
-  .topbar-actions {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-
-  .btn {
-    font-family: var(--font-body);
-    font-size: 13.5px;
-    font-weight: 500;
-    border-radius: 8px;
-    padding: 7px 16px;
-    cursor: pointer;
-    transition: all 0.18s ease;
-    border: none;
-    text-decoration: none;
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-  }
-
-  .btn-ghost {
-    background: transparent;
-    color: var(--ark-muted);
-    border: 1px solid var(--ark-border);
-  }
-  .btn-ghost:hover { color: var(--ark-text); border-color: var(--ark-border-bright); background: rgba(255,255,255,0.04); }
-
-  .btn-primary {
-    background: linear-gradient(135deg, var(--ark-accent) 0%, #E0552A 100%);
-    color: #fff;
-    box-shadow: 0 0 20px rgba(255,107,53,0.3);
-  }
-  .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 0 30px rgba(255,107,53,0.4); }
-  .btn-primary:active { transform: translateY(0); }
-
-  .btn-purple {
-    background: linear-gradient(135deg, var(--ark-accent2) 0%, #5B21B6 100%);
-    color: #fff;
-    box-shadow: 0 0 20px rgba(124,58,237,0.3);
-  }
-  .btn-purple:hover { transform: translateY(-1px); }
-
-  .btn-sm { padding: 5px 12px; font-size: 12.5px; border-radius: 6px; }
-
-  .avatar {
-    width: 32px;
-    height: 32px;
-    border-radius: 50%;
-    background: linear-gradient(135deg, var(--ark-accent2), var(--ark-accent3));
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-family: var(--font-head);
-    font-weight: 700;
-    font-size: 12px;
-    color: #fff;
-    cursor: pointer;
-    flex-shrink: 0;
-  }
-
-  /* ── SIDEBAR ── */
-  .sidebar {
-    background: var(--ark-surface);
-    border-right: 1px solid var(--ark-border);
-    padding: 20px 0;
-    display: flex;
-    flex-direction: column;
-    overflow-y: auto;
-  }
-
-  .sidebar-section-label {
-    font-size: 10px;
-    font-weight: 600;
-    letter-spacing: 1.2px;
-    text-transform: uppercase;
-    color: var(--ark-dim);
-    padding: 0 20px;
-    margin: 20px 0 6px;
-    font-family: var(--font-head);
-  }
-  .sidebar-section-label:first-child { margin-top: 0; }
-
-  .nav-item {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 9px 20px;
-    font-size: 13.5px;
-    color: var(--ark-muted);
-    cursor: pointer;
-    transition: all 0.15s;
-    border-left: 2px solid transparent;
-    text-decoration: none;
-    position: relative;
-  }
-  .nav-item:hover { color: var(--ark-text); background: rgba(255,255,255,0.03); }
-  .nav-item.active {
-    color: var(--ark-text);
-    background: rgba(255,107,53,0.08);
-    border-left-color: var(--ark-accent);
-  }
-  .nav-item.active .nav-icon { color: var(--ark-accent); }
-
-  .nav-icon {
-    width: 16px;
-    height: 16px;
-    flex-shrink: 0;
-    opacity: 0.9;
-  }
-
-  .nav-badge {
-    margin-left: auto;
-    font-size: 11px;
-    padding: 1px 7px;
-    border-radius: 20px;
-    font-weight: 600;
-    font-family: var(--font-head);
-  }
-  .badge-orange { background: rgba(255,107,53,0.2); color: var(--ark-accent); }
-  .badge-green { background: rgba(0,212,170,0.15); color: var(--ark-accent3); }
-  .badge-purple { background: rgba(124,58,237,0.2); color: #A78BFA; }
-
-  .sidebar-bottom {
-    margin-top: auto;
-    padding: 16px 20px;
-    border-top: 1px solid var(--ark-border);
-  }
-
-  .usage-bar-label {
-    display: flex;
-    justify-content: space-between;
-    font-size: 11.5px;
-    color: var(--ark-muted);
-    margin-bottom: 8px;
-  }
-  .usage-bar-track {
-    height: 4px;
-    background: rgba(255,255,255,0.07);
-    border-radius: 4px;
-    overflow: hidden;
-  }
-  .usage-bar-fill {
-    height: 100%;
-    background: linear-gradient(90deg, var(--ark-accent2), var(--ark-accent));
-    border-radius: 4px;
-    width: 62%;
-    transition: width 0.3s;
-  }
-
-  /* ── MAIN ── */
-  .main {
-    overflow-y: auto;
-    padding: 32px;
-    display: flex;
-    flex-direction: column;
-    gap: 28px;
-    background: var(--ark-bg);
-  }
-
-  /* ── UPLOAD ZONE ── */
-  .upload-zone {
-    border: 1.5px dashed rgba(124,58,237,0.4);
-    border-radius: 16px;
-    padding: 48px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 14px;
-    background: rgba(124,58,237,0.04);
-    cursor: pointer;
-    transition: all 0.2s;
-    position: relative;
-    overflow: hidden;
-  }
-  .upload-zone:hover {
-    border-color: rgba(124,58,237,0.7);
-    background: rgba(124,58,237,0.07);
-    transform: scale(1.003);
-  }
-  .upload-zone::before {
-    content: '';
-    position: absolute;
-    width: 300px; height: 300px;
-    background: radial-gradient(circle, rgba(124,58,237,0.12), transparent 70%);
-    top: -50px; right: -50px;
-    pointer-events: none;
-  }
-
-  .upload-icon {
-    width: 52px;
-    height: 52px;
-    background: rgba(124,58,237,0.15);
-    border: 1px solid rgba(124,58,237,0.3);
-    border-radius: 14px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  .upload-title {
-    font-family: var(--font-head);
-    font-size: 17px;
-    font-weight: 600;
-    color: var(--ark-text);
-  }
-
-  .upload-sub {
-    font-size: 13px;
-    color: var(--ark-muted);
-    text-align: center;
-    line-height: 1.6;
-    max-width: 340px;
-  }
-
-  .upload-formats {
-    display: flex;
-    gap: 6px;
-    flex-wrap: wrap;
-    justify-content: center;
-    margin-top: 4px;
-  }
-
-  .format-tag {
-    font-size: 11px;
-    font-family: var(--font-mono);
-    font-weight: 500;
-    padding: 3px 8px;
-    border-radius: 5px;
-    background: rgba(255,255,255,0.06);
-    color: var(--ark-muted);
-    border: 1px solid var(--ark-border);
-  }
-
-  /* ── SECTION HEADER ── */
-  .section-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-  }
-
-  .section-title {
-    font-family: var(--font-head);
-    font-size: 16px;
-    font-weight: 700;
-    color: var(--ark-text);
-    letter-spacing: -0.2px;
-  }
-
-  .section-sub {
-    font-size: 12.5px;
-    color: var(--ark-muted);
-    margin-top: 2px;
-  }
-
-  /* ── STATS ROW ── */
-  .stats-grid {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 14px;
-  }
-
-  .stat-card {
-    background: var(--ark-card);
-    border: 1px solid var(--ark-border);
-    border-radius: 12px;
-    padding: 18px 20px;
-    position: relative;
-    overflow: hidden;
-    transition: border-color 0.2s;
-  }
-  .stat-card:hover { border-color: var(--ark-border-bright); }
-
-  .stat-card::after {
-    content: '';
-    position: absolute;
-    bottom: 0; left: 0; right: 0;
-    height: 2px;
-    background: var(--stat-accent, var(--ark-accent));
-    opacity: 0.6;
-  }
-
-  .stat-label {
-    font-size: 11.5px;
-    color: var(--ark-muted);
-    font-weight: 500;
-    letter-spacing: 0.3px;
-    text-transform: uppercase;
-    font-family: var(--font-head);
-    margin-bottom: 10px;
-  }
-
-  .stat-value {
-    font-family: var(--font-head);
-    font-size: 28px;
-    font-weight: 800;
-    color: var(--ark-text);
-    letter-spacing: -1px;
-    line-height: 1;
-  }
-
-  .stat-change {
-    font-size: 12px;
-    margin-top: 6px;
-    display: flex;
-    align-items: center;
-    gap: 4px;
-  }
-  .stat-change.up { color: var(--ark-accent3); }
-  .stat-change.down { color: #F87171; }
-  .stat-change.neutral { color: var(--ark-muted); }
-
-  /* ── TWO COLS ── */
-  .two-cols {
-    display: grid;
-    grid-template-columns: 1fr 340px;
-    gap: 20px;
-    align-items: start;
-  }
-
-  /* ── CARD ── */
-  .card {
-    background: var(--ark-card);
-    border: 1px solid var(--ark-border);
-    border-radius: 14px;
-    overflow: hidden;
-  }
-
-  .card-header {
-    padding: 18px 22px 14px;
-    border-bottom: 1px solid var(--ark-border);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-  }
-
-  .card-title {
-    font-family: var(--font-head);
-    font-size: 14px;
-    font-weight: 700;
-    color: var(--ark-text);
-  }
-
-  .card-body { padding: 20px 22px; }
-
-  /* ── JOBS TABLE ── */
-  .jobs-table { width: 100%; border-collapse: collapse; }
-
-  .jobs-table th {
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: 0.8px;
-    text-transform: uppercase;
-    color: var(--ark-dim);
-    font-family: var(--font-head);
-    padding: 10px 14px;
-    text-align: left;
-    border-bottom: 1px solid var(--ark-border);
-  }
-
-  .jobs-table td {
-    padding: 14px 14px;
-    font-size: 13.5px;
-    color: var(--ark-text);
-    border-bottom: 1px solid rgba(255,255,255,0.04);
-    vertical-align: middle;
-  }
-
-  .jobs-table tr:last-child td { border-bottom: none; }
-  .jobs-table tr:hover td { background: rgba(255,255,255,0.02); }
-
-  .file-thumb {
-    width: 36px;
-    height: 26px;
-    border-radius: 5px;
-    background: rgba(124,58,237,0.2);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border: 1px solid rgba(124,58,237,0.3);
-  }
-
-  .file-info { display: flex; align-items: center; gap: 10px; }
-  .file-name { font-size: 13.5px; color: var(--ark-text); font-weight: 500; white-space: nowrap; }
-  .file-meta { font-size: 11.5px; color: var(--ark-muted); margin-top: 1px; }
-
-  .status-pill {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    font-size: 12px;
-    font-weight: 500;
-    padding: 4px 10px;
-    border-radius: 20px;
-  }
-  .status-dot {
-    width: 6px; height: 6px;
-    border-radius: 50%;
-  }
-  .status-done { background: rgba(0,212,170,0.12); color: var(--ark-accent3); }
-  .status-done .status-dot { background: var(--ark-accent3); }
-  .status-processing { background: rgba(255,225,71,0.1); color: var(--ark-neon); }
-  .status-processing .status-dot { background: var(--ark-neon); animation: blink 1.2s ease-in-out infinite; }
-  .status-queued { background: rgba(124,58,237,0.12); color: #A78BFA; }
-  .status-queued .status-dot { background: #A78BFA; }
-  .status-error { background: rgba(248,113,113,0.1); color: #F87171; }
-  .status-error .status-dot { background: #F87171; }
-
-  @keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
-
-  .lang-tag {
-    font-family: var(--font-mono);
-    font-size: 11.5px;
-    padding: 3px 8px;
-    border-radius: 5px;
-    background: rgba(255,255,255,0.05);
-    border: 1px solid var(--ark-border);
-    color: var(--ark-muted);
-  }
-
-  .progress-mini {
-    height: 3px;
-    background: rgba(255,255,255,0.07);
-    border-radius: 3px;
-    overflow: hidden;
-    width: 80px;
-  }
-  .progress-mini-fill {
-    height: 100%;
-    border-radius: 3px;
-    background: linear-gradient(90deg, var(--ark-accent2), var(--ark-accent));
-  }
-
-  .row-actions { display: flex; gap: 4px; justify-content: flex-end; }
-
-  /* ── SETTINGS PANEL ── */
-  .settings-panel { display: flex; flex-direction: column; gap: 0; }
-
-  .setting-row {
-    padding: 14px 22px;
-    border-bottom: 1px solid var(--ark-border);
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-  }
-  .setting-row:last-child { border-bottom: none; }
-
-  .setting-label {
-    font-size: 13px;
-    font-weight: 500;
-    color: var(--ark-text);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-  }
-
-  .setting-desc {
-    font-size: 12px;
-    color: var(--ark-muted);
-    line-height: 1.5;
-    margin-top: -4px;
-  }
-
-  .select-ark {
-    font-family: var(--font-body);
-    font-size: 13px;
-    background: rgba(255,255,255,0.05);
-    color: var(--ark-text);
-    border: 1px solid var(--ark-border);
-    border-radius: 8px;
-    padding: 7px 10px;
-    outline: none;
-    cursor: pointer;
-    width: 100%;
-    appearance: none;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%237A7A9A' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
-    background-repeat: no-repeat;
-    background-position: right 10px center;
-    padding-right: 28px;
-    transition: border-color 0.15s;
-  }
-  .select-ark:focus { border-color: var(--ark-accent2); }
-  .select-ark option { background: #1A1B30; }
-
-  /* Toggle */
-  .toggle-wrap { display: flex; align-items: center; gap: 10px; }
-  .toggle {
-    width: 38px; height: 22px;
-    background: rgba(255,255,255,0.1);
-    border-radius: 11px;
-    position: relative;
-    cursor: pointer;
-    transition: background 0.2s;
-    flex-shrink: 0;
-    border: 1px solid rgba(255,255,255,0.08);
-  }
-  .toggle.on { background: linear-gradient(135deg, var(--ark-accent2), var(--ark-accent)); border-color: transparent; }
-  .toggle::after {
-    content: '';
-    position: absolute;
-    top: 2px; left: 2px;
-    width: 16px; height: 16px;
-    background: #fff;
-    border-radius: 50%;
-    transition: transform 0.2s;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.3);
-  }
-  .toggle.on::after { transform: translateX(16px); }
-  .toggle-label { font-size: 13px; color: var(--ark-muted); cursor: pointer; user-select: none; }
-
-  /* Color row */
-  .color-swatches { display: flex; gap: 7px; align-items: center; margin-top: 6px; }
-  .swatch {
-    width: 24px; height: 24px;
-    border-radius: 6px;
-    cursor: pointer;
-    border: 2px solid transparent;
-    transition: transform 0.15s, border-color 0.15s;
-  }
-  .swatch:hover { transform: scale(1.15); }
-  .swatch.active { border-color: #fff; }
-
-  /* Font size slider */
-  .range-ark {
-    width: 100%;
-    accent-color: var(--ark-accent);
-    cursor: pointer;
-    height: 4px;
-  }
-  .range-val {
-    font-family: var(--font-mono);
-    font-size: 12px;
-    color: var(--ark-accent);
-    min-width: 30px;
-    text-align: right;
-  }
-
-  /* ── CAPTION PREVIEW ── */
-  .preview-area {
-    background: #000;
-    border-radius: 12px;
-    aspect-ratio: 16/9;
-    position: relative;
-    overflow: hidden;
-    flex-shrink: 0;
-  }
-
-  .preview-bg {
-    width: 100%; height: 100%;
-    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  .preview-caption {
-    position: absolute;
-    bottom: 20px;
-    left: 50%;
-    transform: translateX(-50%);
-    white-space: nowrap;
-    font-family: var(--font-head);
-    font-size: 16px;
-    font-weight: 700;
-    color: #fff;
-    background: rgba(0,0,0,0.72);
-    padding: 8px 18px;
-    border-radius: 6px;
-    backdrop-filter: blur(4px);
-    border: 1px solid rgba(255,255,255,0.1);
-    text-shadow: 0 1px 4px rgba(0,0,0,0.6);
-    letter-spacing: 0.2px;
-  }
-
-  .preview-placeholder {
-    color: rgba(255,255,255,0.12);
-    font-family: var(--font-head);
-    font-size: 14px;
-    letter-spacing: 2px;
-    text-transform: uppercase;
-  }
-
-  .preview-controls {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    margin-top: 12px;
-  }
-
-  .play-btn {
-    width: 36px; height: 36px;
-    background: linear-gradient(135deg, var(--ark-accent), #E0552A);
-    border-radius: 50%;
-    border: none;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    box-shadow: 0 0 15px rgba(255,107,53,0.4);
-    transition: transform 0.15s;
-    flex-shrink: 0;
-  }
-  .play-btn:hover { transform: scale(1.08); }
-
-  .timeline {
-    flex: 1;
-    height: 4px;
-    background: rgba(255,255,255,0.08);
-    border-radius: 4px;
-    overflow: hidden;
-    cursor: pointer;
-    position: relative;
-  }
-  .timeline-fill {
-    height: 100%;
-    background: linear-gradient(90deg, var(--ark-accent2), var(--ark-accent));
-    width: 34%;
-    border-radius: 4px;
-    transition: width 0.1s linear;
-  }
-
-  .time-txt { font-size: 12px; font-family: var(--font-mono); color: var(--ark-muted); white-space: nowrap; }
-
-  /* ── EXPORT BLOCK ── */
-  .export-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 10px;
-    padding: 16px 22px;
-  }
-
-  .export-btn {
-    background: rgba(255,255,255,0.04);
-    border: 1px solid var(--ark-border);
-    border-radius: 10px;
-    padding: 14px 14px;
-    cursor: pointer;
-    transition: all 0.18s;
-    text-align: left;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-  }
-  .export-btn:hover {
-    background: rgba(255,255,255,0.07);
-    border-color: var(--ark-border-bright);
-    transform: translateY(-1px);
-  }
-
-  .export-icon {
-    width: 32px; height: 32px;
-    border-radius: 8px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 14px;
-    flex-shrink: 0;
-  }
-
-  .export-label { font-size: 12.5px; font-weight: 600; color: var(--ark-text); font-family: var(--font-head); }
-  .export-sub { font-size: 11px; color: var(--ark-muted); margin-top: 1px; }
-
-  /* ── WAVEFORM ── */
-  .waveform {
-    display: flex;
-    align-items: center;
-    gap: 2px;
-    height: 32px;
-    padding: 0 22px 16px;
-  }
-
-  .wave-bar {
-    width: 3px;
-    border-radius: 3px;
-    background: var(--ark-accent2);
-    opacity: 0.5;
-    transition: opacity 0.3s;
-  }
-
-  /* ── NOTIFICATION DOT ── */
-  .notif-dot {
-    width: 7px; height: 7px;
-    background: var(--ark-accent);
-    border-radius: 50%;
-    position: absolute;
-    top: 9px; right: 16px;
-    box-shadow: 0 0 6px var(--ark-accent);
-  }
-
-  /* ── SCROLLBAR ── */
-  ::-webkit-scrollbar { width: 4px; }
-  ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: var(--ark-dim); border-radius: 4px; }
-  ::-webkit-scrollbar-thumb:hover { background: var(--ark-muted); }
-
-  /* ── HOVER PROCESSING LINE ── */
-  .processing-banner {
-    background: linear-gradient(90deg, rgba(124,58,237,0.08), rgba(255,107,53,0.08));
-    border: 1px solid rgba(124,58,237,0.2);
-    border-radius: 10px;
-    padding: 12px 18px;
-    display: flex;
-    align-items: center;
-    gap: 14px;
-    font-size: 13px;
-    color: var(--ark-muted);
-  }
-
-  .processing-spinner {
-    width: 18px; height: 18px;
-    border: 2px solid rgba(124,58,237,0.2);
-    border-top-color: var(--ark-accent2);
-    border-radius: 50%;
-    animation: spin 0.8s linear infinite;
-    flex-shrink: 0;
-  }
-
-  @keyframes spin { to { transform: rotate(360deg); } }
-
-  .processing-file { color: var(--ark-text); font-weight: 500; }
-
-  .processing-pct {
-    margin-left: auto;
-    font-family: var(--font-mono);
-    font-size: 13px;
-    color: var(--ark-accent2);
-    font-weight: 500;
-  }
-
-  .shimmer {
-    animation: shimmer 1.5s ease-in-out infinite;
-  }
-  @keyframes shimmer {
-    0%,100% { opacity: 0.5; }
-    50% { opacity: 1; }
-  }
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ARK | Premium Design & Architecture</title>
+    <meta name="description" content="ARK is a luxury digital agency crafting sophisticated web designs, timeless branding, and high-end 3D interfaces.">
+    <!-- Google Fonts: Luxury Serif & Clean Sans -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;1,400&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <!-- Stylesheets -->
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
+    <!-- Custom Cursor -->
+    <div class="custom-cursor" id="customCursor"></div>
+    <div class="custom-cursor-dot" id="customCursorDot"></div>
 
-<div class="blob blob-1"></div>
-<div class="blob blob-2"></div>
-<div class="blob blob-3"></div>
+    <!-- Ambient Grid & Particle Canvas -->
+    <canvas id="ambientCanvas" class="ambient-canvas"></canvas>
 
-<div class="app-shell">
-
-  <!-- TOPBAR -->
-  <header class="topbar">
-    <a class="logo" href="#">
-      <div class="logo-icon">A</div>
-      <span class="logo-text">Ark Captions</span>
-      <span class="logo-badge">Pro</span>
-    </a>
-    <div class="topbar-spacer"></div>
-    <div class="topbar-actions">
-      <button class="btn btn-ghost btn-sm">
-        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
-        Search jobs
-      </button>
-      <button class="btn btn-ghost btn-sm">
-        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
-      </button>
-      <button class="btn btn-primary">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-        New Job
-      </button>
-      <div class="avatar">AK</div>
-    </div>
-  </header>
-
-  <!-- SIDEBAR -->
-  <nav class="sidebar">
-    <span class="sidebar-section-label">Workspace</span>
-    <a class="nav-item active" href="#">
-      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
-      Dashboard
-    </a>
-    <a class="nav-item" href="#" style="position:relative;">
-      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.5 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>
-      All Jobs
-      <span class="nav-badge badge-orange">12</span>
-    </a>
-    <a class="nav-item" href="#">
-      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/></svg>
-      Processing
-      <span class="nav-badge badge-green shimmer">2</span>
-      <span class="notif-dot"></span>
-    </a>
-    <a class="nav-item" href="#">
-      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-      Analytics
-    </a>
-    <a class="nav-item" href="#">
-      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18M3 9h18M3 15h18"/></svg>
-      Caption Editor
-      <span class="nav-badge badge-purple">Beta</span>
-    </a>
-
-    <span class="sidebar-section-label">Settings</span>
-    <a class="nav-item" href="#">
-      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 010 14.14M4.93 4.93a10 10 0 000 14.14"/></svg>
-      Caption Styles
-    </a>
-    <a class="nav-item" href="#">
-      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
-      Languages
-    </a>
-    <a class="nav-item" href="#">
-      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-      Account
-    </a>
-
-    <div class="sidebar-bottom">
-      <div class="usage-bar-label">
-        <span>Minutes Used</span>
-        <span>620 / 1000</span>
-      </div>
-      <div class="usage-bar-track">
-        <div class="usage-bar-fill"></div>
-      </div>
-    </div>
-  </nav>
-
-  <!-- MAIN CONTENT -->
-  <main class="main">
-
-    <!-- Processing Banner -->
-    <div class="processing-banner">
-      <div class="processing-spinner"></div>
-      <div>
-        Processing <span class="processing-file">product_demo_v3.mp4</span> · Transcribing audio with Ark AI
-      </div>
-      <div class="processing-pct">78%</div>
-    </div>
-
-    <!-- Upload Zone -->
-    <div class="upload-zone" onclick="this.style.borderColor='rgba(124,58,237,0.9)'">
-      <div class="upload-icon">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#A78BFA" stroke-width="2">
-          <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
-          <polyline points="17 8 12 3 7 8"/>
-          <line x1="12" y1="3" x2="12" y2="15"/>
-        </svg>
-      </div>
-      <div class="upload-title">Drop your video or audio here</div>
-      <div class="upload-sub">Drag &amp; drop files, or click to browse. Ark AI will auto-generate accurate captions in seconds.</div>
-      <div class="upload-formats">
-        <span class="format-tag">.mp4</span>
-        <span class="format-tag">.mov</span>
-        <span class="format-tag">.avi</span>
-        <span class="format-tag">.mkv</span>
-        <span class="format-tag">.mp3</span>
-        <span class="format-tag">.wav</span>
-        <span class="format-tag">.m4a</span>
-        <span class="format-tag">.webm</span>
-      </div>
-    </div>
-
-    <!-- Stats -->
-    <div class="stats-grid">
-      <div class="stat-card" style="--stat-accent: var(--ark-accent);">
-        <div class="stat-label">Total Jobs</div>
-        <div class="stat-value">147</div>
-        <div class="stat-change up">↑ 12 this week</div>
-      </div>
-      <div class="stat-card" style="--stat-accent: var(--ark-accent3);">
-        <div class="stat-label">Hours Captioned</div>
-        <div class="stat-value">10.3h</div>
-        <div class="stat-change up">↑ 2.1h vs last week</div>
-      </div>
-      <div class="stat-card" style="--stat-accent: var(--ark-accent2);">
-        <div class="stat-label">Accuracy Rate</div>
-        <div class="stat-value">98.4%</div>
-        <div class="stat-change neutral">· Avg across all jobs</div>
-      </div>
-      <div class="stat-card" style="--stat-accent: var(--ark-neon);">
-        <div class="stat-label">Languages Used</div>
-        <div class="stat-value">9</div>
-        <div class="stat-change up">↑ +EN, FR, JA</div>
-      </div>
-    </div>
-
-    <!-- Two cols: jobs + preview/settings -->
-    <div class="two-cols">
-
-      <!-- Jobs Table -->
-      <div class="card">
-        <div class="card-header">
-          <div>
-            <div class="card-title">Recent Jobs</div>
-            <div class="section-sub">Your latest captioning jobs</div>
-          </div>
-          <div style="display:flex;gap:8px;">
-            <button class="btn btn-ghost btn-sm">Filter</button>
-            <button class="btn btn-ghost btn-sm">Export All</button>
-          </div>
-        </div>
-        <table class="jobs-table">
-          <thead>
-            <tr>
-              <th>File</th>
-              <th>Language</th>
-              <th>Duration</th>
-              <th>Status</th>
-              <th>Date</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td>
-                <div class="file-info">
-                  <div class="file-thumb">
-                    <svg width="14" height="10" viewBox="0 0 14 10" fill="none"><path d="M1 1l5 3.5L11 1M1 9h12V1H1v8z" stroke="#A78BFA" stroke-width="1.2" stroke-linejoin="round"/></svg>
-                  </div>
-                  <div>
-                    <div class="file-name">keynote_2024.mp4</div>
-                    <div class="file-meta">MP4 · 1.2 GB</div>
-                  </div>
-                </div>
-              </td>
-              <td><span class="lang-tag">EN</span></td>
-              <td style="color:var(--ark-muted);font-size:13px;">1h 24m</td>
-              <td><span class="status-pill status-done"><span class="status-dot"></span>Done</span></td>
-              <td style="color:var(--ark-muted);font-size:12.5px;">Apr 5, 2026</td>
-              <td>
-                <div class="row-actions">
-                  <button class="btn btn-ghost btn-sm">Edit</button>
-                  <button class="btn btn-primary btn-sm">↓</button>
-                </div>
-              </td>
-            </tr>
-            <tr>
-              <td>
-                <div class="file-info">
-                  <div class="file-thumb" style="background:rgba(255,107,53,0.15);border-color:rgba(255,107,53,0.3);">
-                    <svg width="14" height="10" viewBox="0 0 14 10" fill="none"><path d="M7 1v8M3 5l4-4 4 4" stroke="#FF6B35" stroke-width="1.2" stroke-linecap="round"/></svg>
-                  </div>
-                  <div>
-                    <div class="file-name">product_demo_v3.mp4</div>
-                    <div class="file-meta">MP4 · 340 MB</div>
-                  </div>
-                </div>
-              </td>
-              <td><span class="lang-tag">EN</span></td>
-              <td>
-                <div class="progress-mini"><div class="progress-mini-fill" style="width:78%"></div></div>
-              </td>
-              <td><span class="status-pill status-processing"><span class="status-dot"></span>Processing</span></td>
-              <td style="color:var(--ark-muted);font-size:12.5px;">Apr 6, 2026</td>
-              <td>
-                <div class="row-actions">
-                  <button class="btn btn-ghost btn-sm">Cancel</button>
-                </div>
-              </td>
-            </tr>
-            <tr>
-              <td>
-                <div class="file-info">
-                  <div class="file-thumb" style="background:rgba(0,212,170,0.1);border-color:rgba(0,212,170,0.3);">
-                    <svg width="14" height="10" viewBox="0 0 14 10" fill="none"><circle cx="7" cy="5" r="3.5" stroke="#00D4AA" stroke-width="1.2"/><path d="M7 2.5v2.5l1.5 1" stroke="#00D4AA" stroke-width="1.2" stroke-linecap="round"/></svg>
-                  </div>
-                  <div>
-                    <div class="file-name">podcast_ep_47.mp3</div>
-                    <div class="file-meta">MP3 · 58 MB</div>
-                  </div>
-                </div>
-              </td>
-              <td><span class="lang-tag">FR</span></td>
-              <td style="color:var(--ark-muted);font-size:13px;">52m</td>
-              <td><span class="status-pill status-done"><span class="status-dot"></span>Done</span></td>
-              <td style="color:var(--ark-muted);font-size:12.5px;">Apr 4, 2026</td>
-              <td>
-                <div class="row-actions">
-                  <button class="btn btn-ghost btn-sm">Edit</button>
-                  <button class="btn btn-primary btn-sm">↓</button>
-                </div>
-              </td>
-            </tr>
-            <tr>
-              <td>
-                <div class="file-info">
-                  <div class="file-thumb" style="background:rgba(248,113,113,0.1);border-color:rgba(248,113,113,0.3);">
-                    <svg width="14" height="10" viewBox="0 0 14 10" fill="none"><path d="M7 2v3M7 7.5v.5" stroke="#F87171" stroke-width="1.5" stroke-linecap="round"/><rect x="1" y="1" width="12" height="8" rx="1.5" stroke="#F87171" stroke-width="1"/></svg>
-                  </div>
-                  <div>
-                    <div class="file-name">webinar_recording.webm</div>
-                    <div class="file-meta">WEBM · 890 MB</div>
-                  </div>
-                </div>
-              </td>
-              <td><span class="lang-tag">ES</span></td>
-              <td style="color:var(--ark-muted);font-size:13px;">—</td>
-              <td><span class="status-pill status-error"><span class="status-dot"></span>Error</span></td>
-              <td style="color:var(--ark-muted);font-size:12.5px;">Apr 3, 2026</td>
-              <td>
-                <div class="row-actions">
-                  <button class="btn btn-ghost btn-sm">Retry</button>
-                </div>
-              </td>
-            </tr>
-            <tr>
-              <td>
-                <div class="file-info">
-                  <div class="file-thumb">
-                    <svg width="14" height="10" viewBox="0 0 14 10" fill="none"><path d="M1 1l5 3.5L11 1M1 9h12V1H1v8z" stroke="#A78BFA" stroke-width="1.2" stroke-linejoin="round"/></svg>
-                  </div>
-                  <div>
-                    <div class="file-name">tutorial_intro.mov</div>
-                    <div class="file-meta">MOV · 220 MB</div>
-                  </div>
-                </div>
-              </td>
-              <td><span class="lang-tag">JA</span></td>
-              <td style="color:var(--ark-muted);font-size:13px;">—</td>
-              <td><span class="status-pill status-queued"><span class="status-dot"></span>Queued</span></td>
-              <td style="color:var(--ark-muted);font-size:12.5px;">Apr 6, 2026</td>
-              <td>
-                <div class="row-actions">
-                  <button class="btn btn-ghost btn-sm">Remove</button>
-                </div>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-
-      <!-- Right Column -->
-      <div style="display:flex;flex-direction:column;gap:20px;">
-
-        <!-- Preview card -->
-        <div class="card">
-          <div class="card-header">
-            <div class="card-title">Caption Preview</div>
-            <button class="btn btn-ghost btn-sm">Edit</button>
-          </div>
-          <div class="card-body" style="padding-top:14px;padding-bottom:14px;">
-            <div class="preview-area">
-              <div class="preview-bg">
-                <span class="preview-placeholder">Preview</span>
-              </div>
-              <div class="preview-caption" id="captionText">Welcome to Ark Captions — AI powered.</div>
+    <!-- Header Navigation -->
+    <header class="floating-header">
+        <nav class="nav-container">
+            <a href="#" class="logo-container" id="logoLink">
+                <img src="assets/logo.png" alt="ARK Studio" class="logo-img">
+            </a>
+            <ul class="nav-links">
+                <li><a href="#services" class="nav-link">Expertise</a></li>
+                <li><a href="#portfolio" class="nav-link">Archive</a></li>
+                <li><a href="#connect" class="nav-link">Inquire</a></li>
+            </ul>
+            <div class="nav-cta">
+                <a href="#connect" class="btn btn-nav magnetic" id="navCtaBtn">
+                    <span>Initiate Contact</span>
+                </a>
             </div>
-            <div class="preview-controls">
-              <button class="play-btn" onclick="togglePlay(this)">
-                <svg id="playIcon" width="12" height="14" viewBox="0 0 12 14" fill="white"><path d="M1 1l10 6L1 13V1z"/></svg>
-              </button>
-              <div class="timeline" onclick="seek(event, this)">
-                <div class="timeline-fill" id="timelineFill"></div>
-              </div>
-              <span class="time-txt" id="timeDisplay">0:20 / 0:58</span>
-            </div>
-            <!-- Waveform -->
-            <div class="waveform" id="waveform"></div>
-          </div>
-        </div>
-
-        <!-- Style Settings -->
-        <div class="card">
-          <div class="card-header">
-            <div class="card-title">Caption Style</div>
-          </div>
-          <div class="settings-panel">
-            <div class="setting-row">
-              <div class="setting-label">Language & Model</div>
-              <select class="select-ark">
-                <option>English (US) — Ark Turbo</option>
-                <option>French — Ark Turbo</option>
-                <option>Spanish — Ark Turbo</option>
-                <option>Japanese — Ark Pro</option>
-                <option>German — Ark Turbo</option>
-              </select>
-            </div>
-            <div class="setting-row">
-              <div class="setting-label">Caption Color</div>
-              <div class="color-swatches">
-                <div class="swatch active" style="background:#FFFFFF;" onclick="setCapColor('#FFFFFF',this)"></div>
-                <div class="swatch" style="background:#FFE147;" onclick="setCapColor('#FFE147',this)"></div>
-                <div class="swatch" style="background:#00D4AA;" onclick="setCapColor('#00D4AA',this)"></div>
-                <div class="swatch" style="background:#FF6B35;" onclick="setCapColor('#FF6B35',this)"></div>
-                <div class="swatch" style="background:#A78BFA;" onclick="setCapColor('#A78BFA',this)"></div>
-                <div class="swatch" style="background:#60A5FA;" onclick="setCapColor('#60A5FA',this)"></div>
-              </div>
-            </div>
-            <div class="setting-row">
-              <div class="setting-label">
-                <span>Font Size</span>
-                <span class="range-val" id="fontSizeVal">18px</span>
-              </div>
-              <input type="range" class="range-ark" min="12" max="32" value="18" step="1"
-                oninput="document.getElementById('fontSizeVal').textContent=this.value+'px'; document.getElementById('captionText').style.fontSize=this.value+'px'">
-            </div>
-            <div class="setting-row">
-              <div class="setting-label">Style</div>
-              <select class="select-ark">
-                <option>Background Box</option>
-                <option>Outline / Stroke</option>
-                <option>Drop Shadow</option>
-                <option>Word Highlight</option>
-                <option>Karaoke Style</option>
-              </select>
-            </div>
-            <div class="setting-row">
-              <div class="setting-label" style="margin-bottom:8px;">Options</div>
-              <div class="toggle-wrap">
-                <div class="toggle on" onclick="this.classList.toggle('on')"></div>
-                <span class="toggle-label">Auto punctuation</span>
-              </div>
-              <div class="toggle-wrap" style="margin-top:8px;">
-                <div class="toggle on" onclick="this.classList.toggle('on')"></div>
-                <span class="toggle-label">Speaker identification</span>
-              </div>
-              <div class="toggle-wrap" style="margin-top:8px;">
-                <div class="toggle" onclick="this.classList.toggle('on')"></div>
-                <span class="toggle-label">Profanity filter</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Export -->
-        <div class="card">
-          <div class="card-header">
-            <div class="card-title">Export</div>
-          </div>
-          <div class="export-grid">
-            <button class="export-btn">
-              <div class="export-icon" style="background:rgba(0,212,170,0.15);">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00D4AA" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
-              </div>
-              <div>
-                <div class="export-label">SRT File</div>
-                <div class="export-sub">SubRip format</div>
-              </div>
+            <!-- Mobile Menu Toggle -->
+            <button class="mobile-toggle" aria-label="Toggle menu" id="mobileMenuBtn">
+                <i data-lucide="menu"></i>
             </button>
-            <button class="export-btn">
-              <div class="export-icon" style="background:rgba(124,58,237,0.15);">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#A78BFA" stroke-width="2"><path d="M14.5 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>
-              </div>
-              <div>
-                <div class="export-label">VTT File</div>
-                <div class="export-sub">WebVTT format</div>
-              </div>
-            </button>
-            <button class="export-btn">
-              <div class="export-icon" style="background:rgba(255,107,53,0.15);">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FF6B35" stroke-width="2"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/></svg>
-              </div>
-              <div>
-                <div class="export-label">Burned Video</div>
-                <div class="export-sub">MP4 + captions</div>
-              </div>
-            </button>
-            <button class="export-btn">
-              <div class="export-icon" style="background:rgba(255,225,71,0.1);">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FFE147" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-              </div>
-              <div>
-                <div class="export-label">Transcript</div>
-                <div class="export-sub">Plain text / DOCX</div>
-              </div>
-            </button>
-          </div>
-        </div>
+        </nav>
+    </header>
 
-      </div>
+    <!-- Mobile Navigation Overlay -->
+    <div class="mobile-menu" id="mobileMenu">
+        <button class="mobile-close" id="mobileMenuCloseBtn"><i data-lucide="x"></i></button>
+        <ul class="mobile-links">
+            <li><a href="#services" class="mobile-link">Expertise</a></li>
+            <li><a href="#portfolio" class="mobile-link">Archive</a></li>
+            <li><a href="#connect" class="mobile-link">Inquire</a></li>
+            <li>
+                <a href="#connect" class="btn btn-primary" style="margin-top: 2rem;">
+                    <span>Initiate Contact</span>
+                </a>
+            </li>
+        </ul>
     </div>
 
-  </main>
-</div>
+    <main>
+        <!-- Hero Section -->
+        <section class="hero-section" id="hero">
+            <div class="container hero-container">
+                <div class="hero-content">
+                    <div class="badge-container hero-badge-reveal">
+                        <span class="glowing-badge">
+                            Est. 2026 &mdash; Digital Atelier
+                        </span>
+                    </div>
+                    <h1 class="hero-title">
+                        <span class="gradient-text">Timeless Form.</span><br>
+                        Infinite Function.
+                    </h1>
+                    <p class="hero-subtitle">
+                        We sculpt digital experiences with architectural precision. Fusing minimalist luxury with sophisticated spatial interfaces to elevate premium brands.
+                    </p>
+                    <div class="hero-ctas">
+                        <a href="#portfolio" class="btn btn-primary magnetic" id="heroPrimaryCta">
+                            <span>View Archive</span>
+                        </a>
+                        <a href="#connect" class="btn btn-secondary magnetic" id="heroSecondaryCta">
+                            <span>Inquire</span>
+                        </a>
+                    </div>
+                </div>
+                <!-- 3D Hero Canvas -->
+                <div class="hero-3d-container">
+                    <canvas id="heroCanvas" class="hero-canvas"></canvas>
+                    <!-- Floating Info Panel -->
+                    <div class="hero-floating-card glass-card scroll-reveal">
+                        <div class="card-header">
+                            <div class="node-status">
+                                <span>INTERACTIVE GEOMETRY</span>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <p class="interactive-prompt">Drag to manipulate the spatial form.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- Down Indicator -->
+            <div class="scroll-down-indicator">
+                <a href="#services">
+                    <span class="scroll-text">Discover</span>
+                    <div class="scroll-line"></div>
+                </a>
+            </div>
+        </section>
 
-<script>
-  // Generate waveform bars
-  const wf = document.getElementById('waveform');
-  const heights = [8,14,20,12,26,18,30,22,16,10,24,28,20,14,18,26,12,22,30,18,24,16,20,10,28,14,22,18,26,12,20,16,24,28,10,22,18,14,26,20,16,28,12,24,18,22,14,20,16,10,28,24,18,22,26,12,20,16];
-  let playPos = 0.34;
-  heights.forEach((h, i) => {
-    const bar = document.createElement('div');
-    bar.className = 'wave-bar';
-    bar.style.height = h + 'px';
-    bar.style.opacity = i / heights.length <= playPos ? '0.9' : '0.25';
-    bar.style.background = i / heights.length <= playPos ? 'var(--ark-accent)' : 'var(--ark-accent2)';
-    wf.appendChild(bar);
-  });
+        <!-- Infinite Marquee Ticker -->
+        <section class="marquee-section" aria-hidden="true">
+            <div class="marquee-track">
+                <div class="marquee-content">
+                    <span class="marquee-item">Web Architecture</span>
+                    <span class="marquee-divider">&mdash;</span>
+                    <span class="marquee-item">Brand Identity</span>
+                    <span class="marquee-divider">&mdash;</span>
+                    <span class="marquee-item">3D Spatial Design</span>
+                    <span class="marquee-divider">&mdash;</span>
+                    <span class="marquee-item">AI Interfaces</span>
+                    <span class="marquee-divider">&mdash;</span>
+                    <span class="marquee-item">Motion & Interaction</span>
+                    <span class="marquee-divider">&mdash;</span>
+                    <span class="marquee-item">Editorial Systems</span>
+                    <span class="marquee-divider">&mdash;</span>
+                    <span class="marquee-item">Luxury Commerce</span>
+                    <span class="marquee-divider">&mdash;</span>
+                </div>
+                <div class="marquee-content" aria-hidden="true">
+                    <span class="marquee-item">Web Architecture</span>
+                    <span class="marquee-divider">&mdash;</span>
+                    <span class="marquee-item">Brand Identity</span>
+                    <span class="marquee-divider">&mdash;</span>
+                    <span class="marquee-item">3D Spatial Design</span>
+                    <span class="marquee-divider">&mdash;</span>
+                    <span class="marquee-item">AI Interfaces</span>
+                    <span class="marquee-divider">&mdash;</span>
+                    <span class="marquee-item">Motion & Interaction</span>
+                    <span class="marquee-divider">&mdash;</span>
+                    <span class="marquee-item">Editorial Systems</span>
+                    <span class="marquee-divider">&mdash;</span>
+                    <span class="marquee-item">Luxury Commerce</span>
+                    <span class="marquee-divider">&mdash;</span>
+                </div>
+            </div>
+        </section>
 
-  // Caption color swatches
-  function setCapColor(color, el) {
-    document.getElementById('captionText').style.color = color;
-    document.querySelectorAll('.swatch').forEach(s => s.classList.remove('active'));
-    el.classList.add('active');
-  }
+        <!-- Services Section (Bento Grid) -->
+        <section class="services-section" id="services">
+            <div class="container">
+                <div class="section-header text-center">
+                    <span class="section-tag">Our Expertise</span>
+                    <h2 class="section-title">The Foundation</h2>
+                    <p class="section-description">Architecting premium digital touchpoints through a rigorous, minimalist methodology.</p>
+                </div>
 
-  // Timeline seek
-  function seek(e, el) {
-    const rect = el.getBoundingClientRect();
-    const pct = (e.clientX - rect.left) / rect.width;
-    document.getElementById('timelineFill').style.width = (pct * 100) + '%';
-    const total = 58;
-    const secs = Math.round(pct * total);
-    document.getElementById('timeDisplay').textContent = `0:${String(secs).padStart(2,'0')} / 0:58`;
-    const captions = [
-      "Welcome to Ark Captions — AI powered.",
-      "Drop your video and get captions instantly.",
-      "Supports 50+ languages with 98% accuracy.",
-      "Export to SRT, VTT, or burned video.",
-      "Professional captions, zero effort."
-    ];
-    const idx = Math.floor(pct * captions.length);
-    document.getElementById('captionText').textContent = captions[Math.min(idx, captions.length - 1)];
-  }
+                <div class="bento-grid">
+                    <!-- Service Card 1 -->
+                    <div class="bento-card glass-card card-double-width tilt-card">
+                        <div class="card-icon-wrap">
+                            <i data-lucide="layout"></i>
+                        </div>
+                        <h3 class="card-title">Immersive Web Architecture</h3>
+                        <p class="card-text">We engineer digital flagships. Blazing-fast, fluid, and impeccably designed web experiences that function as high-end digital real estate for luxury brands.</p>
+                        <div class="card-graphic">
+                            <div class="web-mock-line"></div>
+                        </div>
+                    </div>
 
-  // Play/pause toggle
-  let playing = false;
-  let playInterval;
-  function togglePlay(btn) {
-    playing = !playing;
-    const icon = document.getElementById('playIcon');
-    if (playing) {
-      icon.innerHTML = '<rect x="3" y="2" width="3" height="10" fill="white"/><rect x="8" y="2" width="3" height="10" fill="white"/>';
-      let pct = parseFloat(document.getElementById('timelineFill').style.width) / 100 || 0.34;
-      playInterval = setInterval(() => {
-        pct += 0.003;
-        if (pct >= 1) { pct = 0; }
-        document.getElementById('timelineFill').style.width = (pct * 100) + '%';
-        const total = 58, secs = Math.round(pct * total);
-        document.getElementById('timeDisplay').textContent = `0:${String(secs).padStart(2,'0')} / 0:58`;
-      }, 100);
-    } else {
-      icon.innerHTML = '<path d="M1 1l10 6L1 13V1z" fill="white"/>';
-      clearInterval(playInterval);
-    }
-  }
+                    <!-- Service Card 2 -->
+                    <div class="bento-card glass-card tilt-card">
+                        <div class="card-icon-wrap">
+                            <i data-lucide="diamond"></i>
+                        </div>
+                        <h3 class="card-title">Brand Identity</h3>
+                        <p class="card-text">Timeless typographic systems, sophisticated monograms, and stark visual language crafted for legacy.</p>
+                        <div class="card-graphic">
+                            <div class="branding-logo-box"></div>
+                        </div>
+                    </div>
 
-  // Simulate processing progress
-  let pct = 78;
-  setInterval(() => {
-    pct = Math.min(99, pct + (Math.random() > 0.7 ? 1 : 0));
-    document.querySelector('.processing-pct').textContent = pct + '%';
-  }, 2000);
-</script>
+                    <!-- Service Card 3 -->
+                    <div class="bento-card glass-card card-double-width tilt-card">
+                        <div class="card-icon-wrap">
+                            <i data-lucide="box"></i>
+                        </div>
+                        <h3 class="card-title">Spatial UI & 3D Forms</h3>
+                        <p class="card-text">Transcending flat surfaces. We deploy WebGL and advanced depth-mapping to create tactile, high-end 3D interactions that feel inherently physical.</p>
+                        <div class="card-graphic">
+                            <div class="interfaces-graphic">
+                                <div class="depth-bar bar-1"></div>
+                                <div class="depth-bar bar-2"></div>
+                                <div class="depth-bar bar-3"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Service Card 4 -->
+                    <div class="bento-card glass-card tilt-card">
+                        <div class="card-icon-wrap">
+                            <i data-lucide="watch"></i>
+                        </div>
+                        <h3 class="card-title">Niche Digital Experiences</h3>
+                        <p class="card-text">Tailored architectural touchpoints for luxury goods, horology, and high-end fashion lines.</p>
+                        <div class="card-graphic" style="background-image: url('assets/luxury_watch.png'); background-size: cover; background-position: center; border: 1px solid var(--border-subtle);">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Stats / Numbers Section -->
+        <section class="stats-section">
+            <div class="container">
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <span class="stat-number" data-target="47">0</span>
+                        <span class="stat-suffix">+</span>
+                        <span class="stat-label">Projects Delivered</span>
+                    </div>
+                    <div class="stat-divider"></div>
+                    <div class="stat-item">
+                        <span class="stat-number" data-target="12">0</span>
+                        <span class="stat-suffix"></span>
+                        <span class="stat-label">Industries Served</span>
+                    </div>
+                    <div class="stat-divider"></div>
+                    <div class="stat-item">
+                        <span class="stat-number" data-target="100">0</span>
+                        <span class="stat-suffix">%</span>
+                        <span class="stat-label">Client Retention</span>
+                    </div>
+                    <div class="stat-divider"></div>
+                    <div class="stat-item">
+                        <span class="stat-number" data-target="3">0</span>
+                        <span class="stat-suffix">s</span>
+                        <span class="stat-label">Avg. Response Time</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Portfolio / Gallery Section -->
+        <section class="portfolio-section" id="portfolio">
+            <div class="container">
+                <div class="section-header">
+                    <div>
+                        <span class="section-tag">Selected Works</span>
+                        <h2 class="section-title">The Archive</h2>
+                    </div>
+                    <div class="portfolio-filters">
+                        <button class="filter-btn active" data-filter="all">All</button>
+                        <button class="filter-btn" data-filter="web">Commerce</button>
+                        <button class="filter-btn" data-filter="branding">Identity</button>
+                        <button class="filter-btn" data-filter="spatial">Spatial</button>
+                    </div>
+                </div>
+
+                <div class="portfolio-grid" id="portfolioGrid">
+                    <!-- Project 1 -->
+                    <div class="portfolio-card" data-category="web">
+                        <div class="portfolio-img-container">
+                            <img src="assets/web_design_mockup.png" alt="Premium web design mockup" class="portfolio-img" loading="lazy">
+                        </div>
+                        <div class="portfolio-info">
+                            <span class="portfolio-cat">Commerce Flagship</span>
+                            <h3 class="portfolio-title">Aethera Systems</h3>
+                        </div>
+                    </div>
+
+                    <!-- Project 2 -->
+                    <div class="portfolio-card" data-category="branding">
+                        <div class="portfolio-img-container">
+                            <img src="assets/graphic_branding.png" alt="Luxury brand concept" class="portfolio-img" loading="lazy">
+                        </div>
+                        <div class="portfolio-info">
+                            <span class="portfolio-cat">Identity System</span>
+                            <h3 class="portfolio-title">Chronos Horology</h3>
+                        </div>
+                    </div>
+
+                    <!-- Project 3 -->
+                    <div class="portfolio-card" data-category="spatial">
+                        <div class="portfolio-img-container">
+                            <img src="assets/three_d_interface.png" alt="Tactile 3D UI interface" class="portfolio-img" loading="lazy">
+                        </div>
+                        <div class="portfolio-info">
+                            <span class="portfolio-cat">Spatial Interaction</span>
+                            <h3 class="portfolio-title">Voxel Analytics</h3>
+                        </div>
+                    </div>
+
+                    <!-- Project 4 -->
+                    <div class="portfolio-card" data-category="web">
+                        <div class="portfolio-img-container">
+                            <img src="assets/luxury_ecommerce.png" alt="Luxury fashion e-commerce interface" class="portfolio-img" loading="lazy">
+                        </div>
+                        <div class="portfolio-info">
+                            <span class="portfolio-cat">Luxury Commerce</span>
+                            <h3 class="portfolio-title">Maison Leclaire</h3>
+                        </div>
+                    </div>
+
+                    <!-- Project 5 -->
+                    <div class="portfolio-card" data-category="branding">
+                        <div class="portfolio-img-container">
+                            <img src="assets/editorial_magazine.png" alt="Editorial magazine layout design" class="portfolio-img" loading="lazy">
+                        </div>
+                        <div class="portfolio-info">
+                            <span class="portfolio-cat">Editorial Design</span>
+                            <h3 class="portfolio-title">Noir Journal</h3>
+                        </div>
+                    </div>
+
+                    <!-- Project 6 -->
+                    <div class="portfolio-card" data-category="spatial">
+                        <div class="portfolio-img-container">
+                            <img src="assets/spatial_dashboard.png" alt="Spatial data analytics dashboard" class="portfolio-img" loading="lazy">
+                        </div>
+                        <div class="portfolio-info">
+                            <span class="portfolio-cat">Data Visualization</span>
+                            <h3 class="portfolio-title">Orbis Command</h3>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 3D Separator / Interactive Divider Section -->
+        <section class="divider-section">
+            <div class="container">
+                <div class="divider-content">
+                    <canvas id="dividerCanvas" class="divider-canvas"></canvas>
+                    <div class="divider-text-overlay">
+                        <p class="divider-quote">"We don't follow trends.<br><em>We architect permanence.</em>"</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Contact / Connect Section -->
+        <section class="connect-section" id="connect">
+            <div class="container">
+                <div class="connect-grid">
+                    <!-- Text Info Column -->
+                    <div class="connect-info">
+                        <span class="section-tag">Inquiries</span>
+                        <h2 class="section-title">Initiate<br>a Dialogue</h2>
+                        <p class="section-description">
+                            We collaborate with ambitious visionaries to build category-defining digital assets. Reach out to discuss your commission.
+                        </p>
+
+                        <div class="contact-channels">
+                            <!-- Email Channel -->
+                            <div class="channel-card">
+                                <div class="channel-icon">
+                                    <i data-lucide="mail"></i>
+                                </div>
+                                <div class="channel-details">
+                                    <span class="channel-label">Direct Correspondence</span>
+                                    <a href="mailto:ark203777@gmail.com" class="channel-link">ark203777@gmail.com</a>
+                                </div>
+                            </div>
+                            <!-- WhatsApp Channel -->
+                            <div class="channel-card">
+                                <div class="channel-icon">
+                                    <i data-lucide="phone"></i>
+                                </div>
+                                <div class="channel-details">
+                                    <span class="channel-label">Private Line</span>
+                                    <a href="https://wa.me/923141495630" target="_blank" rel="noopener noreferrer" class="channel-link">03141495630</a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Contact Form Column -->
+                    <div class="connect-form-container">
+                        <div class="contact-form-card">
+                            <form id="contactForm" class="contact-form">
+                                <div class="input-group">
+                                    <input type="text" id="formName" required placeholder=" " class="form-input">
+                                    <label for="formName" class="form-label">Client Name</label>
+                                    <span class="input-glow"></span>
+                                </div>
+
+                                <div class="input-group">
+                                    <input type="email" id="formEmail" required placeholder=" " class="form-input">
+                                    <label for="formEmail" class="form-label">Email Address</label>
+                                    <span class="input-glow"></span>
+                                </div>
+
+                                <div class="input-group">
+                                    <textarea id="formMessage" required placeholder=" " rows="3" class="form-input"></textarea>
+                                    <label for="formMessage" class="form-label">Project Brief</label>
+                                    <span class="input-glow"></span>
+                                </div>
+
+                                <button type="submit" class="btn btn-primary btn-submit magnetic" id="submitFormBtn">
+                                    <span>Submit Inquiry</span>
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="main-footer">
+        <div class="container footer-container">
+            <div class="footer-brand">
+                <div class="footer-logo-text">ARK</div>
+                <p class="footer-tagline">Architecting the future of luxury digital experiences.</p>
+            </div>
+            <div class="footer-meta">
+                <p>&copy; 2026 ARK. All Rights Reserved.</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Scripts -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/ScrollTrigger.min.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="script.js"></script>
 </body>
 </html>
