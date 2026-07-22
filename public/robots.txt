@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://ark-design.vercel.app/sitemap.xml
